@@ -2,8 +2,10 @@ package log
 
 import (
 	"io"
-	"os"
 	"odydb/entry"
+	"os"
+	"path"
+	"syscall"
 )
 
 type Log struct {
@@ -12,7 +14,7 @@ type Log struct {
 }
 
 func (log *Log) Open() (err error) {
-	log.fp, err = os.OpenFile(log.FileName, os.O_RDWR|os.O_CREATE, 0o644)
+	log.fp, err = createFileSync(log.FileName)
 	return err
 }
 
@@ -21,8 +23,11 @@ func (log *Log) Close() error {
 }
 
 func (log *Log) Write(ent *entry.Entry) error {
-	_, err := log.fp.Write(ent.Encode())
-	return err
+	if _, err := log.fp.Write(ent.Encode()); err != nil {
+		return err
+	}
+
+	return log.fp.Sync()
 }
 
 func (log *Log) Read(ent *entry.Entry) (eof bool, err error) {
@@ -35,4 +40,28 @@ func (log *Log) Read(ent *entry.Entry) (eof bool, err error) {
 	} else {
 		return false, nil
 	}
+}
+
+func createFileSync(file string) (*os.File, error) {
+	fp, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0o644)
+	if err != nil {
+		return nil, err
+	}
+	if err = syncDir(path.Base(file)); err != nil {
+		_ = fp.Close()
+		return nil, err
+	}
+
+	return fp, err
+}
+
+func syncDir(file string) error {
+	flags := os.O_RDONLY| syscall.O_DIRECTORY
+	dirfd, err := syscall.Open(path.Dir(file), flags, 0o644)
+	if err != nil {
+		return err
+	}
+
+	defer syscall.Close(dirfd)
+	return syscall.Fsync(dirfd)
 }
