@@ -69,3 +69,59 @@ func TestKVBasic(t *testing.T) {
 
 	// Reopen Case
 }
+
+func TestKVRecovery(t *testing.T) {
+	kv := KV{}
+	kv.log.FileName = ".test_db"
+	defer os.Remove(kv.log.FileName)
+
+	prepare := func() {
+		os.Remove(kv.log.FileName)
+
+		err := kv.Open()
+		assert.Nil(t, err)
+		defer kv.Close()
+
+		updated, err := kv.Set([]byte("k1"), []byte("v1"))
+		assert.True(t, updated && err == nil)
+		updated, err = kv.Set([]byte("k2"), []byte("v2"))
+		assert.True(t, updated && err == nil)
+	}
+
+	// Truncated log case
+	prepare()
+	fp, _ := os.OpenFile(kv.log.FileName, os.O_RDWR, 0o644)
+	st, _ := fp.Stat()
+	fp.Truncate(st.Size() - 1)
+	fp.Close()
+
+	err := kv.Open()
+	assert.Nil(t, err)
+
+	val, ok, err := kv.Get([]byte("k1"))
+	assert.True(t, string(val) == "v1" && ok && err == nil)
+
+	_, ok, err = kv.Get([]byte("k2"))
+	assert.True(t, !ok && err == nil)
+	kv.Close()
+	// Truncated log case
+
+	// Bad Checksum Case
+	prepare()
+	fp, _ = os.OpenFile(kv.log.FileName, os.O_RDWR, 0o644)
+	st, _ = fp.Stat()
+	fp.WriteAt([]byte{0}, st.Size() - 1)
+	fp.Close()
+
+	err = kv.Open()
+	assert.Nil(t, err)
+
+	val, ok, err = kv.Get([]byte("k1"))
+	assert.True(t, string(val) == "v1" && ok && err == nil)
+
+	_, ok, err = kv.Get([]byte("k2"))
+	assert.True(t, !ok && err == nil)
+	kv.Close()
+
+	// Bad Checksum Case
+}

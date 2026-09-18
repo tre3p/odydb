@@ -33,7 +33,7 @@ func (log *Log) Write(ent *entry.Entry) error {
 func (log *Log) Read(ent *entry.Entry) (eof bool, err error) {
 	err = ent.Decode(log.fp)
 
-	if err == io.EOF {
+	if err == io.EOF || err == entry.ErrBadSum || err == io.ErrUnexpectedEOF {
 		return true, nil
 	} else if err != nil {
 		return false, err
