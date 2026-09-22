@@ -53,10 +53,8 @@ func TestKVBasic(t *testing.T) {
 	// Delete Existing Key And Get Case
 
 	// Reopen Case
-	_, err = kv.Set([]byte("k1"), []byte("v1"))
-	assert.Nil(t, err)
-	val, ok, err = kv.Get([]byte("k1"))
-	assert.True(t, string(val) == "v1" && ok && err == nil)
+	updated, err = kv.Set([]byte("k2"), []byte("v2"))
+	assert.True(t, updated && err == nil)
 
 	kv.Close()
 	err = kv.Open()
@@ -64,9 +62,11 @@ func TestKVBasic(t *testing.T) {
 
 	assert.Equal(t, 1, kv.Size())
 
-	val, ok, err = kv.Get([]byte("k1"))
-	assert.True(t, string(val) == "v1" && ok && err == nil)
+	_, ok, err = kv.Get([]byte("k1"))
+	assert.True(t, !ok && err == nil)
 
+	val, ok, err = kv.Get([]byte("k2"))
+	assert.True(t, string(val) == "v2" && ok && err == nil)
 	// Reopen Case
 }
 
