@@ -4,12 +4,20 @@ import "odydb/log"
 import "odydb/entry"
 
 type KV struct {
-	log log.Log
+	Log log.Log
 	mem map[string][]byte
 }
 
+type UpdateMode int
+
+const (
+	ModeUpsert UpdateMode = 0
+	ModeInsert UpdateMode = 1
+	ModeUpdate UpdateMode = 2
+)
+
 func (kv *KV) Open() error {
-	if err := kv.log.Open(); err != nil {
+	if err := kv.Log.Open(); err != nil {
 		return err
 	}
 
@@ -17,7 +25,7 @@ func (kv *KV) Open() error {
 	
 	ent := entry.Entry{}
 	for {
-		eof, err := kv.log.Read(&ent)
+		eof, err := kv.Log.Read(&ent)
 		if err != nil {
 			return err
 		}
@@ -36,7 +44,30 @@ func (kv *KV) Open() error {
 }
 
 func (kv *KV) Close() error {
-	return kv.log.Close()
+	return kv.Log.Close()
+}
+
+func (kv *KV) SetEx(key[] byte, val []byte, mode UpdateMode) (bool, error) {
+	_, exists, err := kv.Get(key)
+
+	if err != nil {
+		return false, err
+	}
+
+	switch mode {
+	case ModeUpsert:
+		return kv.Set(key, val)
+	case ModeInsert:
+		if !exists {
+			return kv.Set(key, val)
+		}
+	case ModeUpdate:
+		if exists {
+			return kv.Set(key, val)
+		}
+	}
+
+	return false, nil
 }
 
 func (kv *KV) Get(key []byte) (val []byte, ok bool, err error) {
@@ -45,7 +76,7 @@ func (kv *KV) Get(key []byte) (val []byte, ok bool, err error) {
 }
 
 func (kv *KV) Set(key []byte, val []byte) (updated bool, err error) {
-	kv.log.Write(&entry.Entry{Key: key, Value: val})
+	kv.Log.Write(&entry.Entry{Key: key, Value: val})
 	kv.mem[string(key)] = val
 	return true, nil
 }
@@ -57,7 +88,7 @@ func (kv *KV) Del(key []byte) (deleted bool, err error) {
 	}
 
 	if exists {
-		kv.log.Write(&entry.Entry{Key: key, Deleted: true})
+		kv.Log.Write(&entry.Entry{Key: key, Deleted: true})
 		delete(kv.mem, string(key))
 	}
 
