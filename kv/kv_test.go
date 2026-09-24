@@ -9,10 +9,10 @@ import (
 
 func TestKVBasic(t *testing.T) {
 	kv := KV{}
-	kv.log.FileName = ".test_db"
-	defer os.Remove(kv.log.FileName)
+	kv.Log.FileName = ".test_db"
+	defer os.Remove(kv.Log.FileName)
 
-	os.Remove(kv.log.FileName) // cleanup before test
+	os.Remove(kv.Log.FileName) // cleanup before test
 	err := kv.Open()
 	assert.Nil(t, err)
 	defer kv.Close()
@@ -72,11 +72,11 @@ func TestKVBasic(t *testing.T) {
 
 func TestKVRecovery(t *testing.T) {
 	kv := KV{}
-	kv.log.FileName = ".test_db"
-	defer os.Remove(kv.log.FileName)
+	kv.Log.FileName = ".test_db"
+	defer os.Remove(kv.Log.FileName)
 
 	prepare := func() {
-		os.Remove(kv.log.FileName)
+		os.Remove(kv.Log.FileName)
 
 		err := kv.Open()
 		assert.Nil(t, err)
@@ -88,9 +88,9 @@ func TestKVRecovery(t *testing.T) {
 		assert.True(t, updated && err == nil)
 	}
 
-	// Truncated log case
+	// Truncated Log case
 	prepare()
-	fp, _ := os.OpenFile(kv.log.FileName, os.O_RDWR, 0o644)
+	fp, _ := os.OpenFile(kv.Log.FileName, os.O_RDWR, 0o644)
 	st, _ := fp.Stat()
 	fp.Truncate(st.Size() - 1)
 	fp.Close()
@@ -104,11 +104,11 @@ func TestKVRecovery(t *testing.T) {
 	_, ok, err = kv.Get([]byte("k2"))
 	assert.True(t, !ok && err == nil)
 	kv.Close()
-	// Truncated log case
+	// Truncated Log case
 
 	// Bad Checksum Case
 	prepare()
-	fp, _ = os.OpenFile(kv.log.FileName, os.O_RDWR, 0o644)
+	fp, _ = os.OpenFile(kv.Log.FileName, os.O_RDWR, 0o644)
 	st, _ = fp.Stat()
 	fp.WriteAt([]byte{0}, st.Size() - 1)
 	fp.Close()
@@ -128,10 +128,10 @@ func TestKVRecovery(t *testing.T) {
 
 func TestKvUpdateMode(t *testing.T) {
 	kv := KV{}
-	kv.log.FileName = ".test_db"
-	defer os.Remove(kv.log.FileName)
+	kv.Log.FileName = ".test_db"
+	defer os.Remove(kv.Log.FileName)
 
-	os.Remove(kv.log.FileName)
+	os.Remove(kv.Log.FileName)
 	err := kv.Open()
 	assert.Nil(t, err)
 	defer kv.Close()
