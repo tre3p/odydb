@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"odydb/cell"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,4 +27,19 @@ func TestParseKeyword(t *testing.T) {
 	assert.False(t, p.tryKeyword("sel"))
 	assert.True(t, p.tryKeyword("SELECT"))
 	assert.True(t, p.tryKeyword("hello") && p.isEnd())
+}
+
+func TestParseValue(t *testing.T) {
+	testParseValue(t, " -123 ", cell.Cell{Type: cell.TypeI64, I64: -123})
+	testParseValue(t, ` 'abc\'\"d' `, cell.Cell{Type: cell.TypeStr, Str: []byte("abc'\"d")})
+	testParseValue(t, ` "abc\'\"d" `, cell.Cell{Type: cell.TypeStr, Str: []byte("abc'\"d")})
+}
+
+func testParseValue(t *testing.T, s string, ref cell.Cell) {
+	p := NewParser(s)
+	out := cell.Cell{}
+	err := p.parseValue(&out)
+	assert.Nil(t, err)
+	assert.True(t, p.isEnd())
+	assert.Equal(t, ref, out)
 }

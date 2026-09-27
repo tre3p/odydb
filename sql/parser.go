@@ -1,6 +1,11 @@
 package sql
 
-import "strings"
+import (
+	"errors"
+	"odydb/cell"
+	"strconv"
+	"strings"
+)
 
 type Parser struct {
 	buf string
@@ -9,6 +14,86 @@ type Parser struct {
 
 func NewParser(s string) Parser {
 	return Parser{buf: s, pos: 0}
+}
+
+func (p *Parser) parseValue(out *cell.Cell) error {
+	p.skipSpaces()
+	if p.pos >= len(p.buf) {
+		return errors.New("expect value")
+	}
+
+	ch := p.buf[p.pos]
+	if ch == '"' || ch == '\'' {
+		return p.parseString(out)
+	} else if isDigit(ch) || ch == '-' || ch == '+' {
+		return p.parseInt(out)
+	} else {
+		return errors.New("expect value")
+	}
+}
+
+func (p *Parser) parseInt(out *cell.Cell) error {
+	localPos := p.pos
+	isNegative := false
+
+	if !isDigit(p.buf[localPos]) {
+		if p.buf[localPos] == '-' {
+			isNegative = true
+		}
+
+		localPos+=1
+	}
+
+	intStartIdx := localPos
+
+	for ;isDigit(p.buf[localPos]); {
+		localPos += 1
+	}
+
+	if intStartIdx == localPos {
+		return errors.New("expect numeric value")
+	}
+
+	parsedInt, err := strconv.Atoi(p.buf[intStartIdx:localPos])
+	if err != nil {
+		return err
+	}
+
+	if isNegative {
+		parsedInt = -parsedInt
+	}
+
+	out.Type = cell.TypeI64
+	out.I64 = int64(parsedInt)
+	p.pos = localPos
+
+	return nil
+}
+
+func (p *Parser) parseString (out *cell.Cell) error {
+	startQuote := p.buf[p.pos]
+	localPos := p.pos+1
+
+	var items []byte
+
+	for ;p.buf[localPos] != startQuote && localPos < len(p.buf); localPos += 1 {
+		if p.buf[localPos] == '\\' {
+			items = append(items, p.buf[localPos+1])
+			localPos += 1
+		} else {
+			items = append(items, p.buf[localPos])
+		}
+	}
+
+	if p.buf[localPos] != startQuote {
+		return errors.New("expected closing quote")
+	}
+
+	out.Type = cell.TypeStr
+	out.Str = items
+	p.pos = localPos+1 // skip closing quote
+
+	return nil
 }
 
 func (p *Parser) tryName() (string, bool) {
