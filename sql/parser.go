@@ -3,6 +3,7 @@ package sql
 import (
 	"errors"
 	"odydb/cell"
+	"odydb/schema"
 	"strconv"
 	"strings"
 )
@@ -12,8 +13,199 @@ type Parser struct {
 	pos int
 }
 
+var supportedDataTypes = map[string]cell.CellType{
+	"string": cell.TypeStr,
+	"int64":  cell.TypeI64,
+}
+
 func NewParser(s string) Parser {
 	return Parser{buf: s, pos: 0}
+}
+
+func (p *Parser) parseStmt() (out interface{}, err error) {
+	if p.tryKeyword("SELECT") {
+		stmt := &StmtSelect{}
+		err = p.parseSelect(stmt)
+		out = stmt
+	} else if p.tryKeyword("CREATE", "TABLE") {
+		stmt := &StmtCreateTable{}
+		err = p.parseCreateTable(stmt)
+		out = stmt
+	} else if p.tryKeyword("INSERT", "INTO") {
+		stmt := &StmtInsert{}
+		err = p.parseInsert(stmt)
+		out = stmt
+	} else if p.tryKeyword("UPDATE") {
+		stmt := &StmtUpdate{}
+		err = p.parseUpdate(stmt)
+		out = stmt
+	} else if p.tryKeyword("DELETE", "FROM") {
+		stmt := &StmtDelete{}
+		err = p.parseDelete(stmt)
+		out = stmt
+	} else {
+		err = errors.New("unknown statement")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+func (p *Parser) parseDelete(out *StmtDelete) error {
+	// TODO
+	return nil
+}
+
+func (p *Parser) parseUpdate(out *StmtUpdate) error {
+	// TODO
+	return nil
+}
+
+func (p *Parser) parseInsert(out *StmtInsert) error {
+	// TODO
+	return nil
+}
+
+func (p *Parser) parseCreateTable(out *StmtCreateTable) error {
+	var ok bool
+	if out.table, ok = p.tryName(); !ok {
+		return errors.New("expect table name")
+	}
+
+	if ok = p.tryPunctuation("("); !ok {
+		return errors.New("expect opening bracket")
+	}
+
+	// parse columns
+	for {
+		if len(out.cols) > 0 && !p.tryPunctuation(",") {
+			return errors.New("expect comma")
+		}
+
+		if p.tryKeyword("primary", "key") {
+			break
+		}
+
+		colName, ok := p.tryName()
+		if !ok {
+			return errors.New("expect column name")
+		}
+
+		colType, ok := p.parseDataType()
+		if !ok {
+			return errors.New("unknown datatype")
+		}
+
+		out.cols = append(out.cols, schema.Column{Name: colName, Type: colType})
+	}
+
+	// parse primary key
+	if ok = p.tryPunctuation("("); !ok {
+		return errors.New("expect opening bracket")
+	}
+
+	for !p.tryPunctuation(")") {
+		if len(out.pkey) > 0 && !p.tryPunctuation(",") {
+			return errors.New("expect comma")
+		}
+
+		pKey, ok := p.tryName()
+		if !ok {
+			return errors.New("expect column name")
+		}
+
+		out.pkey = append(out.pkey, pKey)
+	}
+
+	// end
+	if ok = p.tryPunctuation(")"); !ok {
+		return errors.New("expect closing bracket")
+	}
+	if ok = p.tryPunctuation(";"); !ok {
+		return errors.New("expect semicolon")
+	}
+
+	return nil
+}
+
+func (p *Parser) parseDataType() (t cell.CellType, ok bool) {
+	for k, v := range supportedDataTypes {
+		if p.tryKeyword(k) {
+			return v, true
+		}
+	}
+
+	return
+}
+
+func (p *Parser) parseSelect(out *StmtSelect) error {
+	for !p.tryKeyword("FROM") {
+		if len(out.cols) > 0 && !p.tryPunctuation(",") {
+			return errors.New("expect comma")
+		}
+		if name, ok := p.tryName(); ok {
+			out.cols = append(out.cols, name)
+		} else {
+			return errors.New("expect column")
+		}
+	}
+
+	if len(out.cols) == 0 {
+		return errors.New("expect column list")
+	}
+	var ok bool
+	if out.table, ok = p.tryName(); !ok {
+		return errors.New("expect table name")
+	}
+
+	return p.parseWhere(&out.keys)
+}
+
+func (p *Parser) parseWhere(out *[]NamedCell) error {
+	if !p.tryKeyword("WHERE") {
+		return errors.New("expect WHERE")
+	}
+
+	for !p.tryPunctuation(";") {
+		if len(*out) > 0 && !p.tryKeyword("AND") {
+			return errors.New("expect AND")
+		}
+
+		nCell := NamedCell{}
+		var ok bool
+
+		if nCell.column, ok = p.tryName(); !ok {
+			return errors.New("expect column name")
+		}
+
+		if !p.tryPunctuation("=") {
+			return errors.New("expect equal sign")
+		}
+
+		if err := p.parseValue(&nCell.value); err != nil {
+			return errors.New("expect value")
+		}
+
+		*out = append(*out, nCell)
+	}
+
+	return nil
+}
+
+func (p *Parser) parseEqual(out *NamedCell) error {
+	var ok bool
+	out.column, ok = p.tryName()
+	if !ok {
+		return errors.New("expect column")
+	}
+	if !p.tryPunctuation("=") {
+		return errors.New("expect punctuation")
+	}
+
+	return p.parseValue(&out.value)
 }
 
 func (p *Parser) parseValue(out *cell.Cell) error {
@@ -41,12 +233,12 @@ func (p *Parser) parseInt(out *cell.Cell) error {
 			isNegative = true
 		}
 
-		localPos+=1
+		localPos += 1
 	}
 
 	intStartIdx := localPos
 
-	for ;isDigit(p.buf[localPos]); {
+	for isDigit(p.buf[localPos]) {
 		localPos += 1
 	}
 
@@ -70,13 +262,13 @@ func (p *Parser) parseInt(out *cell.Cell) error {
 	return nil
 }
 
-func (p *Parser) parseString (out *cell.Cell) error {
+func (p *Parser) parseString(out *cell.Cell) error {
 	startQuote := p.buf[p.pos]
-	localPos := p.pos+1
+	localPos := p.pos + 1
 
 	var items []byte
 
-	for ;p.buf[localPos] != startQuote && localPos < len(p.buf); localPos += 1 {
+	for ; p.buf[localPos] != startQuote && localPos < len(p.buf); localPos += 1 {
 		if p.buf[localPos] == '\\' {
 			items = append(items, p.buf[localPos+1])
 			localPos += 1
@@ -91,9 +283,18 @@ func (p *Parser) parseString (out *cell.Cell) error {
 
 	out.Type = cell.TypeStr
 	out.Str = items
-	p.pos = localPos+1 // skip closing quote
+	p.pos = localPos + 1 // skip closing quote
 
 	return nil
+}
+
+func (p *Parser) tryPunctuation(token string) bool {
+	p.skipSpaces()
+	if !(p.pos+len(token) <= len(p.buf) && p.buf[p.pos:p.pos+len(token)] == token) {
+		return false
+	}
+	p.pos += len(token)
+	return true
 }
 
 func (p *Parser) tryName() (string, bool) {
@@ -107,31 +308,37 @@ func (p *Parser) tryName() (string, bool) {
 	nameStartIdx := p.pos
 
 	for localPos < len(p.buf) && isNameContinue(p.buf[localPos]) {
-		localPos+=1
+		localPos += 1
 	}
 
 	p.pos = localPos
 	return p.buf[nameStartIdx:localPos], true
 }
 
-func (p *Parser) tryKeyword(kw string) bool {
+func (p *Parser) tryKeyword(kws ...string) bool {
 	p.skipSpaces()
-
 	localPos := p.pos
-	kwStartIdx := p.pos
 
-	for localPos < len(p.buf) && !isSeparator(p.buf[localPos])  {
-		localPos++
+	for _, kw := range kws {
+		for localPos < len(p.buf) && isSpace(p.buf[localPos]) {
+			localPos += 1
+		}
+
+		kwStartIdx := localPos
+
+		for localPos < len(p.buf) && !isSeparator(p.buf[localPos]) {
+			localPos++
+		}
+
+		parsedKw := strings.ToLower(p.buf[kwStartIdx:localPos])
+
+		if strings.ToLower(kw) != parsedKw {
+			return false
+		}
 	}
 
-	parsedKw := strings.ToLower(p.buf[kwStartIdx:localPos])
-
-	if strings.ToLower(kw) == parsedKw {
-		p.pos = localPos
-		return true
-	} else {
-		return false
-	}
+	p.pos = localPos
+	return true
 }
 
 func (p *Parser) isEnd() bool {
@@ -142,7 +349,7 @@ func (p *Parser) isEnd() bool {
 
 func (p *Parser) skipSpaces() {
 	for p.pos < len(p.buf) && isSpace(p.buf[p.pos]) {
-		p.pos+=1
+		p.pos += 1
 	}
 }
 
