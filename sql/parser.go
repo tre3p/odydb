@@ -55,17 +55,106 @@ func (p *Parser) parseStmt() (out interface{}, err error) {
 }
 
 func (p *Parser) parseDelete(out *StmtDelete) error {
-	// TODO
+	var ok bool
+	if out.table, ok = p.tryName(); !ok {
+		return errors.New("expect table name")
+	}
+
+	if err := p.parseWhere(&out.keys); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (p *Parser) parseUpdate(out *StmtUpdate) error {
-	// TODO
+	var ok bool
+	if out.table, ok = p.tryName(); !ok {
+		return errors.New("expect table name")
+	}
+
+	if ok = p.tryKeyword("set"); !ok {
+		return errors.New("expect 'set'")
+	}
+
+	for !p.tryKeyword("where") {
+		if len(out.value) > 0 && !p.tryPunctuation(",") {
+			return errors.New("expect comma")
+		}
+
+		if keyValue, err := p.parseEquality(); err != nil {
+			return err
+		} else {
+			out.value = append(out.value, *keyValue)
+		}
+	}
+
+	for !p.tryPunctuation(";") {
+		if len(out.keys) > 0 && !p.tryKeyword("and") {
+			return errors.New("expect 'and'")
+		}
+
+		if keyValue, err := p.parseEquality(); err != nil {
+			return err
+		} else {
+			out.keys = append(out.keys, *keyValue)	
+		}
+	}
+
 	return nil
 }
 
+func (p *Parser) parseEquality() (*NamedCell, error) {
+	colName, ok := p.tryName()
+	if !ok {
+		return nil, errors.New("expect column name")
+	}
+
+	if !p.tryPunctuation("=") {
+		return nil, errors.New("expect equal sign")
+	}
+
+	valCell := cell.Cell{}
+	if err := p.parseValue(&valCell); err != nil {
+		return nil, err
+	}
+
+	return &NamedCell{column: colName, value: valCell}, nil
+}
+
 func (p *Parser) parseInsert(out *StmtInsert) error {
-	// TODO
+	var ok bool
+	if out.table, ok = p.tryName(); !ok {
+		return errors.New("expect table name")
+	}
+
+	if !p.tryKeyword("VALUES") {
+		return errors.New("expect 'values'")
+	}
+
+	if !p.tryPunctuation("(") {
+		return errors.New("expect opening bracket")
+	}
+
+
+	for !p.tryPunctuation(")") {
+		if len(out.value) > 0 && !p.tryPunctuation(",") {
+			return errors.New("expect comma")
+		}
+
+		cell := cell.Cell{}
+
+		if err := p.parseValue(&cell); err != nil {
+			return err
+		}
+
+		out.value = append(out.value, cell)
+	}
+
+	if !p.tryPunctuation(";") {
+		return errors.New("expect semicolon")
+	}
+
 	return nil
 }
 
@@ -174,22 +263,11 @@ func (p *Parser) parseWhere(out *[]NamedCell) error {
 			return errors.New("expect AND")
 		}
 
-		nCell := NamedCell{}
-		var ok bool
-
-		if nCell.column, ok = p.tryName(); !ok {
-			return errors.New("expect column name")
+		if nCell, err := p.parseEquality(); err != nil {
+			return err
+		} else {
+			*out = append(*out, *nCell)
 		}
-
-		if !p.tryPunctuation("=") {
-			return errors.New("expect equal sign")
-		}
-
-		if err := p.parseValue(&nCell.value); err != nil {
-			return errors.New("expect value")
-		}
-
-		*out = append(*out, nCell)
 	}
 
 	return nil
