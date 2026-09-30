@@ -5,35 +5,41 @@ import (
 	"odydb/schema"
 )
 
+type SQLResult struct {
+	Updated int
+	Header  []string
+	Values  []schema.Row
+}
+
 type StmtSelect struct {
-	table string
-	cols  []string
-	keys  []NamedCell
+	Table string
+	Cols  []string
+	Keys  []NamedCell
 }
 
 type StmtCreateTable struct {
-	table string
-	cols  []schema.Column
-	pkey  []string
+	Table string
+	Cols  []schema.Column
+	Pkey  []string
 }
 
 type StmtInsert struct {
-	table string
-	value []cell.Cell
+	Table string
+	Value []cell.Cell
 }
 
 type StmtUpdate struct {
-	table string
-	keys  []NamedCell
-	value []NamedCell
+	Table string
+	Keys  []NamedCell
+	Value []NamedCell
 }
 
 type StmtDelete struct {
-	table string
-	keys []NamedCell
+	Table string
+	Keys  []NamedCell
 }
 
 type NamedCell struct {
-	column string
-	value  cell.Cell
+	Column string
+	Value  cell.Cell
 }

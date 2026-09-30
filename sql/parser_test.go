@@ -45,38 +45,38 @@ func TestParseStmt(t *testing.T) {
 
 	s := "    select a  from  t  where  c=1;  "
 	stmt = &StmtSelect{
-		table: "t",
-		cols:  []string{"a"},
-		keys:  []NamedCell{{column: "c", value: cell.Cell{Type: cell.TypeI64, I64: 1}}},
+		Table: "t",
+		Cols:  []string{"a"},
+		Keys:  []NamedCell{{Column: "c", Value: cell.Cell{Type: cell.TypeI64, I64: 1}}},
 	}
 	testParseStatement(t, s, stmt)
 
 	s = "select a,b_02 from T where c=1 and d='e';"
 	stmt = &StmtSelect{
-		table: "T",
-		cols:  []string{"a", "b_02"},
-		keys: []NamedCell{
-			{column: "c", value: cell.Cell{Type: cell.TypeI64, I64: 1}},
-			{column: "d", value: cell.Cell{Type: cell.TypeStr, Str: []byte("e")}},
+		Table: "T",
+		Cols:  []string{"a", "b_02"},
+		Keys: []NamedCell{
+			{Column: "c", Value: cell.Cell{Type: cell.TypeI64, I64: 1}},
+			{Column: "d", Value: cell.Cell{Type: cell.TypeStr, Str: []byte("e")}},
 		},
 	}
 	testParseStatement(t, s, stmt)
 
 	s = "create table t (a string, b int64, primary key (b));"
 	stmt = &StmtCreateTable{
-		table: "t",
-		cols: []schema.Column{
+		Table: "t",
+		Cols: []schema.Column{
 			{Name: "a", Type: cell.TypeStr},
 			{Name: "b", Type: cell.TypeI64},
 		},
-		pkey: []string{"b"},
+		Pkey: []string{"b"},
 	}
 	testParseStatement(t, s, stmt)
 
 	s = "insert into t values (1, 'hi');"
 	stmt = &StmtInsert{
-		table: "t",
-		value: []cell.Cell{
+		Table: "t",
+		Value: []cell.Cell{
 			{Type: cell.TypeI64, I64: 1},
 			{Type: cell.TypeStr, Str: []byte("hi")},
 		},
@@ -85,24 +85,24 @@ func TestParseStmt(t *testing.T) {
 
 	s = "update t set a = 1, b = 2 where c = 3 and d = 4;"
 	stmt = &StmtUpdate{
-		table: "t",
-		value: []NamedCell{
-			{column: "a", value: cell.Cell{Type: cell.TypeI64, I64: 1}},
-			{column: "b", value: cell.Cell{Type: cell.TypeI64, I64: 2}},
+		Table: "t",
+		Value: []NamedCell{
+			{Column: "a", Value: cell.Cell{Type: cell.TypeI64, I64: 1}},
+			{Column: "b", Value: cell.Cell{Type: cell.TypeI64, I64: 2}},
 		},
-		keys: []NamedCell{
-			{column: "c", value: cell.Cell{Type: cell.TypeI64, I64: 3}},
-			{column: "d", value: cell.Cell{Type: cell.TypeI64, I64: 4}},
+		Keys: []NamedCell{
+			{Column: "c", Value: cell.Cell{Type: cell.TypeI64, I64: 3}},
+			{Column: "d", Value: cell.Cell{Type: cell.TypeI64, I64: 4}},
 		},
 	}
 	testParseStatement(t, s, stmt)
 
 	s = "delete from t where c = 3 and d = 4;"
 	stmt = &StmtDelete{
-		table: "t",
-		keys: []NamedCell{
-			{column: "c", value: cell.Cell{Type: cell.TypeI64, I64: 3}},
-			{column: "d", value: cell.Cell{Type: cell.TypeI64, I64: 4}},
+		Table: "t",
+		Keys: []NamedCell{
+			{Column: "c", Value: cell.Cell{Type: cell.TypeI64, I64: 3}},
+			{Column: "d", Value: cell.Cell{Type: cell.TypeI64, I64: 4}},
 		},
 	}
 	testParseStatement(t, s, stmt)
@@ -119,7 +119,7 @@ func testParseValue(t *testing.T, s string, ref cell.Cell) {
 
 func testParseStatement(t *testing.T, s string, ref interface{}) {
 	p := NewParser(s)
-	out, err := p.parseStmt()
+	out, err := p.ParseStmt()
 	assert.Nil(t, err)
 	assert.True(t, p.isEnd())
 	assert.Equal(t, ref, out)

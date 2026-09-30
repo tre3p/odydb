@@ -22,7 +22,7 @@ func NewParser(s string) Parser {
 	return Parser{buf: s, pos: 0}
 }
 
-func (p *Parser) parseStmt() (out interface{}, err error) {
+func (p *Parser) ParseStmt() (out interface{}, err error) {
 	if p.tryKeyword("SELECT") {
 		stmt := &StmtSelect{}
 		err = p.parseSelect(stmt)
@@ -56,11 +56,11 @@ func (p *Parser) parseStmt() (out interface{}, err error) {
 
 func (p *Parser) parseDelete(out *StmtDelete) error {
 	var ok bool
-	if out.table, ok = p.tryName(); !ok {
+	if out.Table, ok = p.tryName(); !ok {
 		return errors.New("expect table name")
 	}
 
-	if err := p.parseWhere(&out.keys); err != nil {
+	if err := p.parseWhere(&out.Keys); err != nil {
 		return err
 	}
 
@@ -69,7 +69,7 @@ func (p *Parser) parseDelete(out *StmtDelete) error {
 
 func (p *Parser) parseUpdate(out *StmtUpdate) error {
 	var ok bool
-	if out.table, ok = p.tryName(); !ok {
+	if out.Table, ok = p.tryName(); !ok {
 		return errors.New("expect table name")
 	}
 
@@ -78,26 +78,26 @@ func (p *Parser) parseUpdate(out *StmtUpdate) error {
 	}
 
 	for !p.tryKeyword("where") {
-		if len(out.value) > 0 && !p.tryPunctuation(",") {
+		if len(out.Value) > 0 && !p.tryPunctuation(",") {
 			return errors.New("expect comma")
 		}
 
 		if keyValue, err := p.parseEquality(); err != nil {
 			return err
 		} else {
-			out.value = append(out.value, *keyValue)
+			out.Value = append(out.Value, *keyValue)
 		}
 	}
 
 	for !p.tryPunctuation(";") {
-		if len(out.keys) > 0 && !p.tryKeyword("and") {
+		if len(out.Keys) > 0 && !p.tryKeyword("and") {
 			return errors.New("expect 'and'")
 		}
 
 		if keyValue, err := p.parseEquality(); err != nil {
 			return err
 		} else {
-			out.keys = append(out.keys, *keyValue)	
+			out.Keys = append(out.Keys, *keyValue)
 		}
 	}
 
@@ -119,12 +119,12 @@ func (p *Parser) parseEquality() (*NamedCell, error) {
 		return nil, err
 	}
 
-	return &NamedCell{column: colName, value: valCell}, nil
+	return &NamedCell{Column: colName, Value: valCell}, nil
 }
 
 func (p *Parser) parseInsert(out *StmtInsert) error {
 	var ok bool
-	if out.table, ok = p.tryName(); !ok {
+	if out.Table, ok = p.tryName(); !ok {
 		return errors.New("expect table name")
 	}
 
@@ -136,9 +136,8 @@ func (p *Parser) parseInsert(out *StmtInsert) error {
 		return errors.New("expect opening bracket")
 	}
 
-
 	for !p.tryPunctuation(")") {
-		if len(out.value) > 0 && !p.tryPunctuation(",") {
+		if len(out.Value) > 0 && !p.tryPunctuation(",") {
 			return errors.New("expect comma")
 		}
 
@@ -148,7 +147,7 @@ func (p *Parser) parseInsert(out *StmtInsert) error {
 			return err
 		}
 
-		out.value = append(out.value, cell)
+		out.Value = append(out.Value, cell)
 	}
 
 	if !p.tryPunctuation(";") {
@@ -160,7 +159,7 @@ func (p *Parser) parseInsert(out *StmtInsert) error {
 
 func (p *Parser) parseCreateTable(out *StmtCreateTable) error {
 	var ok bool
-	if out.table, ok = p.tryName(); !ok {
+	if out.Table, ok = p.tryName(); !ok {
 		return errors.New("expect table name")
 	}
 
@@ -170,7 +169,7 @@ func (p *Parser) parseCreateTable(out *StmtCreateTable) error {
 
 	// parse columns
 	for {
-		if len(out.cols) > 0 && !p.tryPunctuation(",") {
+		if len(out.Cols) > 0 && !p.tryPunctuation(",") {
 			return errors.New("expect comma")
 		}
 
@@ -188,7 +187,7 @@ func (p *Parser) parseCreateTable(out *StmtCreateTable) error {
 			return errors.New("unknown datatype")
 		}
 
-		out.cols = append(out.cols, schema.Column{Name: colName, Type: colType})
+		out.Cols = append(out.Cols, schema.Column{Name: colName, Type: colType})
 	}
 
 	// parse primary key
@@ -197,7 +196,7 @@ func (p *Parser) parseCreateTable(out *StmtCreateTable) error {
 	}
 
 	for !p.tryPunctuation(")") {
-		if len(out.pkey) > 0 && !p.tryPunctuation(",") {
+		if len(out.Pkey) > 0 && !p.tryPunctuation(",") {
 			return errors.New("expect comma")
 		}
 
@@ -206,7 +205,7 @@ func (p *Parser) parseCreateTable(out *StmtCreateTable) error {
 			return errors.New("expect column name")
 		}
 
-		out.pkey = append(out.pkey, pKey)
+		out.Pkey = append(out.Pkey, pKey)
 	}
 
 	// end
@@ -232,25 +231,25 @@ func (p *Parser) parseDataType() (t cell.CellType, ok bool) {
 
 func (p *Parser) parseSelect(out *StmtSelect) error {
 	for !p.tryKeyword("FROM") {
-		if len(out.cols) > 0 && !p.tryPunctuation(",") {
+		if len(out.Cols) > 0 && !p.tryPunctuation(",") {
 			return errors.New("expect comma")
 		}
 		if name, ok := p.tryName(); ok {
-			out.cols = append(out.cols, name)
+			out.Cols = append(out.Cols, name)
 		} else {
 			return errors.New("expect column")
 		}
 	}
 
-	if len(out.cols) == 0 {
+	if len(out.Cols) == 0 {
 		return errors.New("expect column list")
 	}
 	var ok bool
-	if out.table, ok = p.tryName(); !ok {
+	if out.Table, ok = p.tryName(); !ok {
 		return errors.New("expect table name")
 	}
 
-	return p.parseWhere(&out.keys)
+	return p.parseWhere(&out.Keys)
 }
 
 func (p *Parser) parseWhere(out *[]NamedCell) error {
@@ -275,7 +274,7 @@ func (p *Parser) parseWhere(out *[]NamedCell) error {
 
 func (p *Parser) parseEqual(out *NamedCell) error {
 	var ok bool
-	out.column, ok = p.tryName()
+	out.Column, ok = p.tryName()
 	if !ok {
 		return errors.New("expect column")
 	}
@@ -283,7 +282,7 @@ func (p *Parser) parseEqual(out *NamedCell) error {
 		return errors.New("expect punctuation")
 	}
 
-	return p.parseValue(&out.value)
+	return p.parseValue(&out.Value)
 }
 
 func (p *Parser) parseValue(out *cell.Cell) error {
